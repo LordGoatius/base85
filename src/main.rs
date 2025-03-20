@@ -1,4 +1,15 @@
-use std::{array, io::{stdout, Read, Write}, process::exit};
+use std::{array, io::Read, process::exit};
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Config {
+    #[arg(short, long, default_value_t = 80)]
+    wrap: usize,
+    #[arg(short, long, default_value_t = false)]
+    decode: bool,
+    file: String
+}
 
 fn u32_to_85(input: u32) -> [u8; 5] {
     let input = input.to_be();
@@ -9,12 +20,10 @@ fn u32_to_85(input: u32) -> [u8; 5] {
 }
 
 fn main() {
-    let args: Vec<_> = std::env::args().collect();
+    let config = Config::parse();
+
     let mut file = std::io::BufReader::new(
-        std::fs::File::open(args.get(1).unwrap_or_else(|| {
-            eprintln!("No file passed");
-            exit(1);
-        }))
+        std::fs::File::open(config.file)
         .unwrap_or_else(|_| {
             eprintln!("Invalid file name");
             exit(1);
@@ -33,8 +42,8 @@ fn main() {
 
     while size > 0 {
         if size != 4 {
-            for i in (4 - size)..4 {
-                buf[i] = 0;
+            for item in buf.iter_mut().skip(4-size) {
+                *item = 0;
             }
         }
 
@@ -42,21 +51,13 @@ fn main() {
         let chars = u32_to_85(buf_u32);
 
         for i in chars.into_iter() {
-            if printed == 80 {
-                print!("\n");
+            if printed == config.wrap {
+                println!("");
                 printed = 0;
             }
             print!("{}", i as char);
             printed += 1;
         }
-
-        //println!(
-        //    "{:?}",
-        //    chars
-        //        .into_iter()
-        //        .map(|x| unsafe { char::from_u32_unchecked(x as u32) })
-        //        .collect::<String>()
-        //);
 
         size = file.read(&mut buf).unwrap_or_else(|_| {
             eprintln!("Invalid read");
@@ -64,6 +65,5 @@ fn main() {
         });
     }
 
-    print!("~>");
-    stdout().flush().unwrap();
+    println!("~>");
 }
